@@ -1,75 +1,62 @@
-const Expense = require('../models/expense');
-
-const addExpense =async (req, res, next) => {
-    try {
-      const amount = req.body.amount;
-      const description = req.body.description;
-      const category = req.body.category;
-      const data = await Expense.create({ amount: amount, description: description, category: category });
-      res.status(201).json({ newExpense: data }); 
-    } catch (err) {
-      console.log(err);
-      res.status(500).json(err); 
+const Expense = require('../models/expenses');
 
 
-    };
-}
+const addExpense = (req, res) => {
+    const { amount, description, category } = req.body;
+    console.log('Request body:', req.body);
 
-
-
-const getExpense =async (req, res, next) => {
-    try {
-      const expenses = await Expense.findAll();
-      res.status(200).json({ allExpense: expenses }); 
-    } catch (err) {
-      console.log(err);
-      res.status(500).json(err);
+    if (amount === undefined || description === undefined || category === undefined) {
+        return res.status(400).json({ success: false, message: 'Parameters missing' });
     }
-}
+
+    Expense.create({ amount, description, category, userId: req.user.id })
+        .then(expense => {
+            return res.status(201).json({ success: true, expense });
+        })
+        .catch(err => {
+            console.error(err);
+            return res.status(500).json({ success: false, error: 'Failed to create expense' });
+        });
+};
+
+const getExpenses = (req, res) => {
+    req.user
+        .getExpenses()
+        .then(expenses => {
+            return res.status(200).json({ success: true, expenses });
+        })
+        .catch(err => {
+            console.error(err);
+            return res.status(500).json({ success: false, error: 'Failed to fetch expenses' });
+        });
+};
 
 
-const editExpense = async (req, res, next) => {
-    try {
-      const expenseId = req.params.id;
-      const amount = req.body.amount;
-      const description = req.body.description;
-      const category = req.body.category;
-  
-      const expense = await Expense.findByPk(expenseId);
-      expense.amount = amount;
-      expense.description = description;
-      expense.category = category;
-      await expense.save();
-      res.status(200).json({ editedExpense: expense });
-    } catch (err) {
-      console.log(err);
-      res.status(500).json(err);
+const deleteExpense = (req, res) => {
+    const expenseId = req.params.expenseid;
+    console.log("expenseId = ",req.params.expenseid)
+
+    if (expenseId === undefined || expenseId.length === 0) {
+        return res.status(400).json({ success: false, message: 'Invalid parameters' });
     }
-  }
 
-const deleteExpense =  async (req, res, next) => {
-    try {
-      const expenseId = req.params.id;
-      const expense = await Expense.findByPk(expenseId);
-      console.log('expenseId:', expenseId);
-      
-      await expense.destroy();
-      res.status(204).send(); 
-     
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: 'Internal Server Error' });
-    }
-  }
-  
-  
-  
+    Expense.destroy({ where: { id: expenseId, userId: req.user.id } })
+        .then(noOfRows => {
+            if (noOfRows === 0) {
+                return res.status(404).json({ success: false, message: "Expense doesn't belong to the user" });
+            }
+            return res.status(200).json({ success: true, message: 'Expense deleted successfully' });
+        })
+        .catch(err => {
+            console.error(err);
+            return res.status(500).json({ success: false, error: 'Failed to delete expense' });
+        });
+        
+};
 
+module.exports = {
+    deleteExpense,
+    getExpenses,
+    addExpense
+};
 
-
-module.exports={
-  addExpense,
-  getExpense,
-  editExpense,
-  deleteExpense
-}
